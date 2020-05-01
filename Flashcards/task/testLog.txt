@@ -1,0 +1,111 @@
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+There are no cards with errors.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+add
+The card:
+France
+The definition of the card:
+Paris
+The pair ("France":"Paris") has been added.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+ask
+How many times to ask?
+2
+Print the definition of "France":
+France
+Wrong answer. (The correct one is "Paris".)
+Print the definition of "France":
+??
+Wrong answer. (The correct one is "Paris".)
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+The hardest card is "France".You have 2 errors answering it.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+reset stats
+Card statistics has been reset.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+There are no cards with errors.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+add
+The card:
+Russia
+The definition of the card:
+Moscow
+The pair ("Russia":"Moscow") has been added.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+ask
+How many times to ask?
+2
+Print the definition of "Russia":
+??
+Wrong answer. (The correct one is "Moscow".)
+Print the definition of "Russia":
+??
+Wrong answer. (The correct one is "Moscow".)
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+The hardest card is "Russia".You have 2 errors answering it.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+ask
+How many times to ask?
+2
+Print the definition of "France":
+??
+Wrong answer. (The correct one is "Paris".)
+Print the definition of "Russia":
+??
+Wrong answer. (The correct one is "Moscow".)
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+The hardest card is "Russia".You have 3 errors answering it.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+ask
+How many times to ask?
+2
+Print the definition of "France":
+??
+Wrong answer. (The correct one is "Paris".)
+Print the definition of "Russia":
+??
+Wrong answer. (The correct one is "Moscow".)
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+The hardest card is "Russia".You have 4 errors answering it.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+ask
+How many times to ask?
+2
+Print the definition of "France":
+??
+Wrong answer. (The correct one is "Paris".)
+Print the definition of "France":
+??
+Wrong answer. (The correct one is "Paris".)
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+The hardest cards are "France", "Russia". You have 4 errors answering them.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+ask
+How many times to ask?
+2
+Print the definition of "Russia":
+??
+Wrong answer. (The correct one is "Moscow".)
+Print the definition of "Russia":
+??
+Wrong answer. (The correct one is "Moscow".)
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+hardest card
+The hardest card is "Russia".You have 6 errors answering it.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+export
+File Name:
+capitals.txt
+2 cards have been saved.
+Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+log
+File name:
+testLog.txt
+The log has been saved.

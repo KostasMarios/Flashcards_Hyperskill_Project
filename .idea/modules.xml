@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Flashcards/task/Flashcards-task.iml" filepath="$PROJECT_DIR$/.idea/modules/Flashcards/task/Flashcards-task.iml" group="Flashcards1/Flashcards-task" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Flashcards/task/Flashcards-task_main.iml" filepath="$PROJECT_DIR$/.idea/modules/Flashcards/task/Flashcards-task_main.iml" group="Flashcards1/Flashcards-task" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Flashcards/task/Flashcards-task_test.iml" filepath="$PROJECT_DIR$/.idea/modules/Flashcards/task/Flashcards-task_test.iml" group="Flashcards1/Flashcards-task" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/Flashcards1.iml" filepath="$PROJECT_DIR$/.idea/Flashcards1.iml" group="Flashcards1" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Problems/Fixing the main method/Problems-Fixing_the_main_method.iml" filepath="$PROJECT_DIR$/.idea/modules/Problems/Fixing the main method/Problems-Fixing_the_main_method.iml" group="Flashcards1/Problems-Fixing_the_main_method" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Problems/Fixing the main method/Problems-Fixing_the_main_method_main.iml" filepath="$PROJECT_DIR$/.idea/modules/Problems/Fixing the main method/Problems-Fixing_the_main_method_main.iml" group="Flashcards1/Problems-Fixing_the_main_method" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Problems/Fixing the main method/Problems-Fixing_the_main_method_test.iml" filepath="$PROJECT_DIR$/.idea/modules/Problems/Fixing the main method/Problems-Fixing_the_main_method_test.iml" group="Flashcards1/Problems-Fixing_the_main_method" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/util/util.iml" filepath="$PROJECT_DIR$/.idea/modules/util/util.iml" group="Flashcards1/util" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/util/util_main.iml" filepath="$PROJECT_DIR$/.idea/modules/util/util_main.iml" group="Flashcards1/util" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/util/util_test.iml" filepath="$PROJECT_DIR$/.idea/modules/util/util_test.iml" group="Flashcards1/util" />
+    </modules>
+  </component>
+</project>

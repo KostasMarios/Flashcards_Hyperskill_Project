@@ -1,0 +1,49 @@
+<h2 style="text-align: center;">Description</h2>
+
+<p>We cannot play Flashcards with only one card, right? Let's make our program dynamic! Implement a custom card creation mechanism. Read a <em>term</em> and a <em>definition</em> from the console and create a card.</p>
+
+<p>After that, a user inputs a line as an <strong>answer</strong> (a definition of the card). Compare the user's answer to the correct definition and print the verdict.</p>
+
+<h2 style="text-align: center;">How to submit?</h2>
+
+<p>This stage is auto-graded. The grader will input 3 lines (term, definition, answer) and check that your output contains a word:</p>
+
+<ul>
+	<li><code class="java">wrong</code> if the answer isn't equal to the definition,</li>
+	<li><code class="java">right</code> if the answer is equal to the definition.</li>
+</ul>
+
+<p> </p>
+
+<p>Again, here are some examples to clarify the stage.</p>
+
+<h2 style="text-align: center;">Examples</h2>
+
+<p>Note that in our example "a purring animal" is actually a term, while a "cat" is a definition because it makes more sense to use these flashcards for guessing the animal by its features. We hope this little confusion will help you in learning the formal meanings of the words term and definition.</p>
+
+<p><strong>Example 1:</strong></p>
+
+<p>Input</p>
+
+<pre><code class="language-no-highlight">a purring animal
+cat
+cat
+</code></pre>
+
+<p>Output</p>
+
+<pre><code class="language-no-highlight">Your answer is right!
+</code></pre>
+
+<p><strong>Example 2:</strong></p>
+
+<p>Input</p>
+
+<pre><code class="language-no-highlight">a barking animal
+dog
+cat
+</code></pre>
+
+<p>Output</p>
+
+<pre><code class="language-no-highlight">Your answer is wrong...</code></pre>

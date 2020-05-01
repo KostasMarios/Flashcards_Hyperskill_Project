@@ -1,0 +1,909 @@
+type: edu
+custom_name: stage7
+files:
+- name: test/common/DialogClue.kt
+  visible: false
+  text: |
+    package common
+
+    import org.hyperskill.hstest.testcase.CheckResult
+    import org.hyperskill.hstest.testcase.TestCase
+
+
+    // ---- DialogClue ----
+
+    /** May be several lines or just one. */
+    interface Phrase {
+        fun toPhraseLines(): List<PhraseLine>
+    }
+
+    /** list of input and output lines, combined together. */
+    fun compositePhrase(block: () -> List<Phrase>) = object : Phrase {
+        override fun toPhraseLines() = block().flatMap { it.toPhraseLines() }
+    }
+
+    fun compositePhrase(vararg phrases: Phrase) = object : Phrase {
+        override fun toPhraseLines() = phrases.flatMap { it.toPhraseLines() }
+    }
+
+    /** Either user (input) or output phrase. Each phrase should be a line. */
+    sealed class PhraseLine : Phrase {
+        override fun toPhraseLines() = listOf(this)
+    }
+
+    /** Some mutable data, that is passed across dialog phrases. */
+    class Context {
+        val rawData = mutableMapOf<String, Any>()
+    }
+
+    class UserLine(val text: String, val updateContext: CtxUpdate = {}) : PhraseLine() {
+
+    }
+    typealias CtxUpdate = (ctx: Context) -> Unit
+
+    class OutputLine(val checker: (text: String, ctx: Context) -> CheckResult) : PhraseLine()
+
+    /** This function creates a line with user input (our test input).
+     *
+     * Unfortunately we can't access the Context, when we adding user text.
+     * This occurs because of HS test framework limitations:
+     * we need to pass all inputs first, and then start checking outputs. */
+    fun user(text: String, updateContext: (ctx: Context) -> Unit = {}) = UserLine(text, updateContext)
+
+    fun anyLine(updateContext: CtxUpdate = {}) = OutputLine { _, ctx -> CheckResult.correct().also { updateContext(ctx) } }
+
+    fun containing(
+            vararg parts: String,
+            ignoreCase: Boolean = true,
+            hint: String? = null,
+            updateContext: CtxUpdate = {}
+    ) = OutputLine { line, context ->
+        fun buildFeedback(): String {
+            val feedback = StringBuilder()
+            feedback.append("Your line\n`$line`\nshould contain ${parts.joinToString("`, `", "`", "`")}")
+            if (ignoreCase) {
+                feedback.append(" (ignoring case)")
+            }
+            feedback.append(".")
+            if (hint != null) {
+                feedback.append("\n$hint")
+            }
+            return feedback.toString()
+        }
+
+        var startIndex = 0
+        for (part in parts) {
+            startIndex = line.indexOf(part, startIndex, ignoreCase)
+            if (startIndex == -1) {
+                return@OutputLine CheckResult.wrong(buildFeedback())
+            }
+        }
+        updateContext(context) // everything is correct, update context
+        CheckResult.correct();
+    }
+
+    class DialogClue(private val phrases: List<PhraseLine>) {
+
+        private val inputPhrases = phrases.filter { it is UserLine }.map { it as UserLine }
+        private val outputPhrases = phrases.filter { it is OutputLine }.map { it as OutputLine }
+
+        fun generateInput() = inputPhrases
+                .joinToString("\n", postfix = "\n") { it.text }
+
+        fun checkOutput(output: String): CheckResult {
+            val lines = output.lines()
+                    .filter { it.isNotBlank() }
+
+            fun wrongOutputSizeFeedback() = CheckResult.wrong("The number of lines in your output is ${lines.size}, " +
+                    "but it should be ${outputPhrases.size}. " +
+                    "Check, that you output your lines with println, not print. And there are no extra outputs.")
+
+    // here we store some mutable data from phrase to phrase
+            val context = Context()
+
+            val lineIter = lines.listIterator()
+            phrases.forEach { phraseLine ->
+                when (phraseLine) {
+                    is UserLine -> phraseLine.updateContext(context)
+                    is OutputLine -> {
+                        if (!lineIter.hasNext()) {
+                            return wrongOutputSizeFeedback()
+                        }
+                        val result = phraseLine.checker(lineIter.next(), context)
+                        if (!result.isCorrect) {
+                            return CheckResult.wrong(result.feedback)
+                        }
+                    }
+                }
+            }
+
+            if (lineIter.hasNext()) {
+                return wrongOutputSizeFeedback()
+            }
+
+            return CheckResult.correct();
+        }
+    }
+
+    fun dialogTest(vararg phrases: Phrase, consoleArgs: Array<String> = emptyArray()): TestCase<DialogClue> {
+        val dialogClue = DialogClue(phrases.flatMap { it.toPhraseLines() })
+        return TestCase<DialogClue>()
+                .setInput(dialogClue.generateInput())
+                .setAttach(dialogClue)
+                .addArguments(*consoleArgs)
+    }
+  learner_created: false
+- name: test/common/FlashcardsStage7Test.kt
+  visible: false
+  text: |
+    package common
+
+    import org.hyperskill.hstest.stage.StageTest
+    import org.hyperskill.hstest.testcase.CheckResult
+    import org.hyperskill.hstest.testcase.TestCase
+    import flashcards.Main
+    import java.io.File
+
+
+    abstract class FlashcardsStage7Test : StageTest<DialogClue>(Main::class.java) {
+
+        override fun generate(): List<TestCase<DialogClue>> {
+            File("capitals.txt").delete()
+            File("capitalsNew.txt").delete()
+            val tests = mutableListOf<TestCase<DialogClue>>()
+
+            val capitalList = mutableListOf<Pair<String, String>>()
+            fun capitals() = capitalList.toTypedArray()
+
+            // wrappers for add/remove card, but saving cards to capitalList:
+            fun addCapital(card: String, def: String) = addCard(card, def)
+                    .also { capitalList += card to def }
+
+            fun removeCapital(card: String) = removeCard(card)
+                    .also { capitalList.removeIf { it.first == card } }
+
+            // clear files
+            tests += dialogTest(
+                    exportCards("capitals.txt", 0),
+                    exportCards("capitalsNew.txt", 0),
+                    exit()
+            )
+            tests += dialogTest(
+                    addCapital("France", "Paris"),
+                    addCapital("Russia", "Moscow"),
+                    askCards("France", "??", ""),
+                    exit(),
+                    exportArg(2),
+                    consoleArgs = arrayOf("-export", "capitals.txt")
+            )
+            tests += dialogTest(
+                    importArg(2, *capitals()),
+                    addCapital("Japan", "Tokyo"),
+                    askCards("Moscow", "Paris", "Tokyo"),
+                    exit(),
+                    exportArg(3),
+                    consoleArgs = arrayOf("-import", "capitals.txt", "-export", "capitalsNew.txt")
+            )
+            tests += dialogTest(
+                    importArg(3, *capitals()),
+                    askCards("Moscow", "Paris", "Tokyo"),
+                    removeCapital("Japan"),
+                    exit(),
+                    exportArg(2),
+                    consoleArgs = arrayOf("-export", "capitals.txt", "-import", "capitalsNew.txt")
+            )
+            tests += dialogTest(
+                    importArg(2, *capitals()),
+                    exit(),
+                    consoleArgs = arrayOf("-import", "capitals.txt")
+            )
+
+            return tests
+        }
+
+        override fun check(reply: String, clue: DialogClue): CheckResult {
+            return clue.checkOutput(reply)
+        }
+
+
+        // ------ extensions for building a dialog: ------
+
+        fun importArg(count: Int, vararg cards: Pair<String, String>) =
+                containing("$count cards have been loaded",
+                        updateContext = { ctx ->
+                            cards.forEach { (card, def) ->
+                                ctx.addCard(card, def)
+                                ctx.wrongCards.removeAll(listOf(card))
+                            }
+                        })
+
+        fun exportArg(count: Int) = containing("$count cards have been saved")
+
+
+        fun inputAction(action: String) = compositePhrase {
+            listOf(containing("action", hint = "This line should ask the action."), user(action))
+        }
+
+        inner class LogPhrase(val fileName: String) : Phrase {
+            override fun toPhraseLines() = compositePhrase(
+                    inputAction("log"),
+                    anyLine(),
+                    user(fileName),
+                    OutputLine { text, ctx ->
+                        val result = containing("saved", hint = "This line should indicate, that the log has been saved.").checker(text, ctx)
+                        if (!result.isCorrect) {
+                            return@OutputLine result
+                        }
+                        if (!File(fileName).exists()) {
+                            return@OutputLine CheckResult.wrong("The log file $fileName does not exist.")
+                        }
+                        CheckResult.correct();
+                    }
+            ).toPhraseLines()
+        }
+
+        private fun log(fileName: String) = LogPhrase(fileName)
+
+        private fun resetStats() = compositePhrase(
+                inputAction("reset stats"), containing("reset", hint = "This line should confirm card statistics reset.",
+                updateContext = { ctx -> ctx.wrongCards.clear() })
+        )
+
+        /** Between tests we cache wrong answered capitals to check hardest cards, when we restore them from file. */
+        private val wrongAnweredCapitals: MutableList<String> = mutableListOf()
+
+        /** [customWrongCards] are used to load saved wrong cards from the previous test. */
+        fun hardestCards(customWrongCards: List<String>? = null) = compositePhrase(
+                inputAction("hardest card"),
+                OutputLine { text, ctx ->
+                    if (customWrongCards != null) {
+                        ctx.wrongCards.clear()
+                        ctx.wrongCards.addAll(customWrongCards)
+                    }
+                    val groupedCards = ctx.wrongCards
+                            .groupBy { it }.mapValues { (_, v) -> v.size }
+                    val maxMistakes = groupedCards.values.max() ?: 0
+                    val hardestCards = groupedCards.filterValues { it == maxMistakes }.keys.toList()
+
+                    when (hardestCards.size) {
+                        0 -> return@OutputLine containing("There are no cards with errors").checker(text, ctx)
+                        1 -> return@OutputLine containing("The hardest card is \"${hardestCards[0]}\"",
+                                "$maxMistakes").checker(text, ctx)
+                        else -> {
+                            hardestCards.forEach { card ->
+                                if (card !in text) {
+                                    return@OutputLine CheckResult.wrong("Your line `$text`\n" +
+                                            "should contain the hardest cards " +
+                                            "${hardestCards.joinToString("\", \"", "\"", "\"")} with $maxMistakes mistakes.")
+                                }
+                            }
+                            val numberOfHardestCards = text.count { it == '"' }
+                            if (numberOfHardestCards != hardestCards.size * 2) {
+                                return@OutputLine CheckResult.wrong("Your line `$text`\n" +
+                                        "contains more hardest cards, than expected. Expected: $hardestCards.")
+                            }
+                            if (maxMistakes.toString() !in text) {
+                                if (numberOfHardestCards != hardestCards.size) {
+                                    return@OutputLine CheckResult.wrong("Your line `$text`\n" +
+                                            "should contain $maxMistakes mistakes for your hardest cards.")
+                                }
+                            }
+                        }
+                    }
+                    CheckResult.correct();
+                }
+        )
+
+
+        // extend dialog context with our own data:
+
+        @Suppress("UNCHECKED_CAST")
+        private val Context.cardToDef
+            get() = rawData.getOrPut("cardToDef") { mutableMapOf<String, String>() } as MutableMap<String, String>
+
+        @Suppress("UNCHECKED_CAST")
+        /** All cards, that were answered wrong. */
+        private val Context.wrongCards
+            get() = rawData.getOrPut("wrongCards") { mutableListOf<String>() } as MutableList<String>
+
+
+        @Suppress("UNCHECKED_CAST")
+        private val Context.defToCard
+            get() = rawData.getOrPut("defToCard") { mutableMapOf<String, String>() } as MutableMap<String, String>
+
+        private fun Context.addCard(card: String, definition: String) {
+            cardToDef[card] = definition
+            defToCard[definition] = card
+        }
+
+        private fun Context.removeCard(card: String) {
+            val def = cardToDef.remove(card)
+            if (def != null) {
+                defToCard.remove(def)
+            }
+        }
+
+
+        private fun addCard(card: String, def: String) = compositePhrase(
+                inputAction("add"),
+                anyLine(), user(card),
+                anyLine(), user(def),
+                containing("has been added",
+                        hint = "This line should add the pair (\"$card\":\"$def\").",
+                        updateContext = { ctx -> ctx.addCard(card, def) })
+        )
+
+
+        private fun existingDef(card: String, def: String) = compositePhrase(
+                inputAction("add"),
+                anyLine(), user(card),
+                anyLine(), user(def),
+                containing("definition", "exists", hint = "This line should reject the existing definition `$def`.")
+        )
+
+
+        private fun existingCard(card: String) = compositePhrase(
+                inputAction("add"),
+                anyLine(), user(card),
+                containing("card", "exists", hint = "This line should reject the existing card `$card`.")
+        )
+
+        private fun removeCard(card: String) = compositePhrase(
+                inputAction("remove"),
+                anyLine(), user(card),
+                containing("has been removed", hint = "This line should remove the card `$card`.",
+                        updateContext = { ctx -> ctx.removeCard(card) })
+        )
+
+        private fun removeNonExisting(card: String) = compositePhrase(
+                inputAction("remove"),
+                anyLine(), user(card),
+                containing("Can't remove \"$card\"", hint = "This line should reject removing non existing card `$card`.")
+        )
+
+
+        private fun importCards(fileName: String, vararg cards: Pair<String, String>) = compositePhrase(
+                inputAction("import"),
+                anyLine(), user(fileName),
+                containing("${cards.size} cards have been loaded",
+                        updateContext = { ctx ->
+                            val cardToDef = ctx.cardToDef
+                            val defToCard = ctx.defToCard
+                            cards.forEach { (card, def) ->
+                                if (card in cardToDef) {
+                                    defToCard.remove(cardToDef[card]) // erase wrong reverse link
+                                }
+                                ctx.addCard(card, def) // with update!!
+                            }
+                        })
+        )
+
+        private fun importNonExisting(fileName: String) = compositePhrase(
+                inputAction("import"),
+                anyLine(), user(fileName),
+                containing("not found", hint = "This line should say, that the file $fileName does not exist.")
+        )
+
+        private fun exportCards(fileName: String, cardsSize: Int) = compositePhrase(
+                inputAction("export"),
+                anyLine(), user(fileName),
+                containing("$cardsSize cards have been saved")
+        )
+
+        private fun exit() = compositePhrase(
+                inputAction("exit"),
+                anyLine()
+        )
+
+        /** Perform ask action. [ansDefs] are our test answers with definitions.
+         * We don't know are they wrong or correct, because the test is random. */
+        private fun askCards(vararg ansDefs: String, saveWrongAnsweredCapitals: Boolean = false) = compositePhrase {
+            val startPhrases = listOf(
+                    inputAction("ask"),
+                    anyLine(), user(ansDefs.size.toString())
+            )
+            // here we add the dialog logic, by creating base OutputLine class with a custom checker
+            // we use context to connect with neighbor checkers
+
+            // iterate test answered definitions:
+            val repeatingPhrases = ansDefs.map { ansDef ->
+                compositePhrase(
+                        OutputLine { text, ctx ->
+                            val askedCard = text.dropWhile { it != '"' }.dropLastWhile { it != '"' }.trim('"')
+                            if (askedCard.isEmpty()) {
+                                return@OutputLine CheckResult.wrong("Not found card in quotes. " +
+                                        "This line should ask the definition of a random card.")
+                            }
+                            if (askedCard !in ctx.cardToDef) {
+                                return@OutputLine CheckResult.wrong("You asked the definition of the non existing card: `$askedCard`.")
+                            }
+                            ctx.rawData["lastAskedCard"] = askedCard
+                            CheckResult.correct();
+                        },
+                        // unfortunately we can't access the Context in user action, see documentation of user()
+                        user(ansDef),
+                        // check the answer:
+                        OutputLine { text, ctx ->
+                            val askedCard = ctx.rawData["lastAskedCard"]?.toString()
+                                    ?: throw IllegalStateException("Not found lastAskedCard in the `ask` checker.")
+                            val cardToDef = ctx.cardToDef
+                            val defToCard = ctx.defToCard
+                            val rightAns = cardToDef[askedCard]
+
+                            val hint = "The asked card was `$askedCard`, the answer was `$ansDef`."
+                            if (cardToDef[askedCard] == ansDef)
+                                containing("Correct answer", hint = hint).checker(text, ctx)
+                            else {
+                                ctx.wrongCards += askedCard
+
+                                val isDefFor = defToCard[ansDef]
+                                if (isDefFor != null) {
+                                    containing("Wrong answer", "The correct one is \"$rightAns\"",
+                                            "you've just written the definition of \"$isDefFor\"", hint = hint).checker(text, ctx)
+                                } else {
+                                    // should not contain definition hint!!
+                                    if (text.contains("you've just written the definition of")) {
+                                        CheckResult.wrong("Your line\n`$text`\nshould NOT contain " +
+                                                "`you've just written the definition of`.\n$hint")
+                                    } else {
+                                        containing("Wrong answer", "The correct one is \"$rightAns\"", hint = hint).checker(text, ctx)
+                                    }
+
+                                }
+                            }.also {
+                                // only for these tests. To test restoring wrong capitals from file.
+                                if (saveWrongAnsweredCapitals) {
+                                    wrongAnweredCapitals.clear()
+                                    wrongAnweredCapitals.addAll(ctx.wrongCards)
+                                }
+                            }
+                        }
+                )
+            }
+            (startPhrases + repeatingPhrases)
+        }
+    }
+  learner_created: false
+- name: test/FlashcardsTest.java
+  visible: false
+  text: |
+    import common.FlashcardsStage7Test;
+
+    public class FlashcardsTest extends FlashcardsStage7Test {
+        // just empty class, but not abstract so it can be run
+    }
+  learner_created: false
+- name: src/flashcards/Main.java
+  visible: true
+  text: |
+    package flashcards;
+
+    import java.io.*;
+    import java.util.*;
+
+    public class Main {
+        public static void main(String[] args)
+        {
+
+            String cardTerm ;//Map key
+            String cardDefinition = null;//Map value
+            Integer error;
+            String answer;//user answer
+            boolean termExists; //to check if the term exists in Map
+            boolean definitionExists; // to check the definition exists in Map
+            boolean exit = false; // to exit from loop
+            Random generator;
+            Object[] keys;
+            String randomKey;
+            Integer timesToAsk;
+            int loadedCards = 0;
+            Map<String,String> cardMap = new LinkedHashMap<>();
+            Map<String,Integer> failuresCardMap = new LinkedHashMap<>();
+            ArrayList<String> logArrayList = new ArrayList<>();
+            Scanner scanner = new Scanner(System.in);
+            Scanner fileScanner;
+
+            do
+            {
+                termExists = false;
+                definitionExists = false;
+                System.out.println("Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):");
+                logArrayList.add("Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):");
+                answer = scanner.nextLine();
+                logArrayList.add(answer);
+                //ADD
+                if (answer.equals("add"))
+                {
+                    System.out.println("The card:");
+                    logArrayList.add("The card:");
+                    cardTerm = scanner.nextLine();
+                    logArrayList.add(cardTerm);
+
+                    //if the Map isn't empty AND the term exists
+                    if(!cardMap.isEmpty() && cardMap.containsKey(cardTerm) )
+                    {
+
+                        System.out.println("The card \""+cardTerm+"\" already exists.");
+                        logArrayList.add("The card \""+cardTerm+"\" already exists.");
+                        termExists = true;
+
+                    }
+                    if ( !termExists)
+                    {
+                        System.out.println("The definition of the card:");
+                        logArrayList.add("The definition of the card:");
+                        cardDefinition = scanner.nextLine();
+                        logArrayList.add(cardDefinition);
+                        //if the Map isn't empty AND the definition exists
+                        if(!cardMap.isEmpty() && cardMap.containsValue(cardDefinition))
+                        {
+                            System.out.println("The definition \"" + cardDefinition + "\" already exists.");
+                            logArrayList.add("The definition \"" + cardDefinition + "\" already exists.");
+                            definitionExists = true;
+                        }
+
+                    }
+                    //if term AND definition NOT exists
+                    if (!termExists && !definitionExists)
+                    {
+                        cardMap.put(cardTerm,cardDefinition);
+                        failuresCardMap.put(cardTerm,0);
+                        System.out.println("The pair (\""+cardTerm+"\":\""+cardDefinition+"\") has been added.");
+                        logArrayList.add("The pair (\""+cardTerm+"\":\""+cardDefinition+"\") has been added.");
+                    }
+                }
+                //REMOVE
+                else if (answer.equals("remove"))
+                {
+                    System.out.println("The card:");
+                    logArrayList.add("The card:");
+                    cardTerm = scanner.nextLine();
+                    logArrayList.add(cardTerm);
+
+                    if (cardMap.remove(cardTerm,cardMap.get(cardTerm)))
+                    {
+                        System.out.println("The card has been removed.");
+                        logArrayList.add("The card has been removed.");
+                    }
+                    else
+                    {
+                        System.out.println("Can't remove \"" + cardTerm + "\": there is no such card.");
+                        logArrayList.add("Can't remove \"" + cardTerm + "\": there is no such card.");
+                    }
+                    //Remove failure from Map
+                    if (failuresCardMap.containsKey(cardTerm))
+                        failuresCardMap.remove(cardTerm,failuresCardMap.get(cardTerm));
+                }
+                //IMPORT
+                else if (answer.equals("import"))
+                {
+                    System.out.println("File Name:");
+                    logArrayList.add("File Name:");
+                    answer = scanner.nextLine();
+                    logArrayList.add(answer);
+                    try(FileReader fileReader = new FileReader(answer))
+                    {
+                        fileScanner = new Scanner(new BufferedReader(fileReader));
+                        fileScanner.useDelimiter(":");
+                        while (fileScanner.hasNextLine())
+                        {
+                            String input = fileScanner.nextLine();
+                            String[] data = input.split(":");
+                            cardTerm = data[0];
+                            cardDefinition = data[1];
+                            error = Integer.parseInt(data[2]);
+    //                        fileScanner.skip(fileScanner.delimiter());
+    //                        fileScanner.nextLine();
+                            //System.out.println("Term:"+cardTerm+" Definition:"+cardDefinition);
+                            cardMap.put(cardTerm,cardDefinition);
+                            failuresCardMap.put(cardTerm,error);
+                            loadedCards++;
+                        }
+                        System.out.println(loadedCards+" cards have been loaded.");
+                        logArrayList.add(loadedCards+" cards have been loaded.");
+                        loadedCards=0;
+                        //System.out.println("The map has "+cardMap.size()+" cards");
+                    }
+                    catch (IOException ex)
+                    {
+                        System.out.println("File not found.");
+                        logArrayList.add("File not found.");
+
+                    }
+                }
+                //EXPORT
+                else if (answer.equals("export"))
+                {
+                    System.out.println("File Name:");
+                    logArrayList.add("File Name:");
+                    answer = scanner.nextLine();
+                    logArrayList.add(answer);
+                    try(FileWriter fileWriter = new FileWriter(answer))
+                    {
+                        for (Map.Entry<String,String> entry : cardMap.entrySet())
+                        {
+                            fileWriter.write(entry.getKey()+":"+entry.getValue()+":");
+                            if (failuresCardMap.containsKey(entry.getKey()))
+                                fileWriter.write(failuresCardMap.get(entry.getKey()).toString()+"\n");
+                            else
+                                fileWriter.write("0\n");
+                        }
+                        System.out.println(cardMap.size()+" cards have been saved.");
+                        logArrayList.add(cardMap.size()+" cards have been saved.");
+                    }
+                    catch (IOException ex)
+                    {
+                        System.out.println(ex.getMessage());
+                    }
+                }
+                //ASK
+                else if (answer.equals("ask"))
+                {
+                    generator = new Random();
+                    //return the keys of Map
+                    keys = cardMap.keySet().toArray();
+                    System.out.println("How many times to ask?");
+                    logArrayList.add("How many times to ask?");
+                    timesToAsk = scanner.nextInt();
+                    logArrayList.add(timesToAsk.toString());
+                    scanner.nextLine();
+                    for (int i=0; i<timesToAsk; i++)
+                    {
+
+                        randomKey = (String) keys[generator.nextInt(keys.length)];
+                        System.out.println("Print the definition of \""+randomKey+"\":");
+                        logArrayList.add("Print the definition of \""+randomKey+"\":");
+                        answer = scanner.nextLine();
+                        logArrayList.add(answer);
+                        if (answer.equals(cardMap.get(randomKey)))
+                        {
+                            System.out.print("Correct answer.\n");
+                            logArrayList.add("Correct answer.");
+                        }
+                        else
+                        {
+                            System.out.print("Wrong answer. (The correct one is \""+cardMap.get(randomKey)+"\"");
+                            String stringForLogArray = "Wrong answer. (The correct one is \""+cardMap.get(randomKey)+"\"";
+                            if (failuresCardMap.containsKey(randomKey))
+                            {
+                                int failureNum = failuresCardMap.get(randomKey);
+                                failureNum++;
+                                failuresCardMap.put(randomKey,failureNum);
+                            }
+                            else
+                                failuresCardMap.put(randomKey,1);
+                            //if user answer exists in map
+                            if (cardMap.containsValue(answer))
+                            {
+                                for (Map.Entry<String,String> entry : cardMap.entrySet())
+                                {
+                                    //print the term of user definition
+                                    if (answer.equals(entry.getValue()))
+                                    {
+                                        System.out.print(", you've just written the definition of \"" + entry.getKey() + "\".)\n");
+                                        stringForLogArray += ", you've just written the definition of \""+entry.getKey()+"\".)";
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                System.out.print(".)\n");
+                                stringForLogArray += ".)";
+                            }
+                            logArrayList.add(stringForLogArray);
+                        }
+                    }
+                }
+                //EXIT
+                else if (answer.equals("exit"))
+                {
+                    System.out.print("Bye bye!");
+                    //logArrayList.add("Bye bye!");
+                    exit = true;
+                }
+                //LOG
+                else if (answer.equals("log"))
+                {
+                    System.out.println("File name:");
+                    logArrayList.add("File name:");
+                    answer = scanner.nextLine();
+                    logArrayList.add(answer);
+                    File logFile = new File(answer);
+                    try(PrintWriter pw = new PrintWriter(new FileOutputStream(logFile)))
+                    {
+                        for (String logString : logArrayList)
+                            pw.println(logString);
+                        pw.println("The log has been saved.");
+                        System.out.println("The log has been saved.");
+                    }
+                    catch (FileNotFoundException ex)
+                    {
+                        System.out.println("File not found");
+                    }
+                }
+                //HARDEST CARD
+                else if (answer.equals("hardest card"))
+                {
+                    if (failuresCardMap.isEmpty())
+                    {
+                        System.out.println("There are no cards with errors.");
+                        logArrayList.add("There are no cards with errors.");
+                    }
+                    else
+                    {
+                        ArrayList<String> maxFailures = new ArrayList<>();
+                        int counter = 0;
+                        int maxValueInMap = Collections.max(failuresCardMap.values());
+                        if (maxValueInMap == 0) {
+                            System.out.println("There are no cards with errors.");
+                            logArrayList.add("There are no cards with errors.");
+                        } else {
+
+                            for (Map.Entry<String, Integer> entry : failuresCardMap.entrySet()) {
+                                if (entry.getValue() == maxValueInMap)
+                                    maxFailures.add(entry.getKey());
+                            }
+
+                            if (maxFailures.size() == 1) {
+                                System.out.println("The hardest card is \"" + maxFailures.get(0) + "\".You have " + maxValueInMap + " errors answering it.");
+                                logArrayList.add("The hardest card is \"" + maxFailures.get(0) + "\".You have " + maxValueInMap + " errors answering it.");
+                            } else {
+                                System.out.print("The hardest cards are");
+                                String failuresForLogArray = "The hardest cards are";
+                                for (int i = 0; i < (maxFailures.size() - 1); i++) {
+                                    System.out.print(" \"" + maxFailures.get(i) + "\",");
+                                    failuresForLogArray += " \"" + maxFailures.get(i) + "\",";
+                                    counter = i;
+                                }
+                                System.out.println(" \"" + maxFailures.get(counter + 1) + "\". You have " + maxValueInMap + " errors answering them.");
+                                failuresForLogArray += " \"" + maxFailures.get(counter + 1) + "\". You have " + maxValueInMap + " errors answering them.";
+                                logArrayList.add(failuresForLogArray);
+                            }
+                        }
+                    }
+                }
+                //RESET STATS
+                else if (answer.equals("reset stats"))
+                {
+                    for (Map.Entry<String,Integer> entry : failuresCardMap.entrySet())
+                    {
+                        if (failuresCardMap.containsKey(entry.getKey()))
+                            failuresCardMap.put(entry.getKey(), 0);
+                    }
+    //                failuresCardMap.clear();
+                    System.out.println("Card statistics has been reset.");
+                    logArrayList.add("Card statistics has been reset.");
+                }
+
+            }while (!exit);
+
+        }
+    }
+  learner_created: true
+- name: capitals.txt
+  visible: true
+  text: |
+    France:Paris:4
+    Russia:Moscow:6
+  learner_created: true
+- name: testLog.txt
+  visible: true
+  text: |
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    There are no cards with errors.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    add
+    The card:
+    France
+    The definition of the card:
+    Paris
+    The pair ("France":"Paris") has been added.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    ask
+    How many times to ask?
+    2
+    Print the definition of "France":
+    France
+    Wrong answer. (The correct one is "Paris".)
+    Print the definition of "France":
+    ??
+    Wrong answer. (The correct one is "Paris".)
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    The hardest card is "France".You have 2 errors answering it.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    reset stats
+    Card statistics has been reset.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    There are no cards with errors.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    add
+    The card:
+    Russia
+    The definition of the card:
+    Moscow
+    The pair ("Russia":"Moscow") has been added.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    ask
+    How many times to ask?
+    2
+    Print the definition of "Russia":
+    ??
+    Wrong answer. (The correct one is "Moscow".)
+    Print the definition of "Russia":
+    ??
+    Wrong answer. (The correct one is "Moscow".)
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    The hardest card is "Russia".You have 2 errors answering it.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    ask
+    How many times to ask?
+    2
+    Print the definition of "France":
+    ??
+    Wrong answer. (The correct one is "Paris".)
+    Print the definition of "Russia":
+    ??
+    Wrong answer. (The correct one is "Moscow".)
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    The hardest card is "Russia".You have 3 errors answering it.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    ask
+    How many times to ask?
+    2
+    Print the definition of "France":
+    ??
+    Wrong answer. (The correct one is "Paris".)
+    Print the definition of "Russia":
+    ??
+    Wrong answer. (The correct one is "Moscow".)
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    The hardest card is "Russia".You have 4 errors answering it.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    ask
+    How many times to ask?
+    2
+    Print the definition of "France":
+    ??
+    Wrong answer. (The correct one is "Paris".)
+    Print the definition of "France":
+    ??
+    Wrong answer. (The correct one is "Paris".)
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    The hardest cards are "France", "Russia". You have 4 errors answering them.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    ask
+    How many times to ask?
+    2
+    Print the definition of "Russia":
+    ??
+    Wrong answer. (The correct one is "Moscow".)
+    Print the definition of "Russia":
+    ??
+    Wrong answer. (The correct one is "Moscow".)
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    hardest card
+    The hardest card is "Russia".You have 6 errors answering it.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    export
+    File Name:
+    capitals.txt
+    2 cards have been saved.
+    Input action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+    log
+    File name:
+    testLog.txt
+    The log has been saved.
+  learner_created: false
+- name: capitalsNew.txt
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/projects/44/stages/238/implement
+status: Solved
+record: -1

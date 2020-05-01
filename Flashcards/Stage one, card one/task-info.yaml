@@ -1,0 +1,26 @@
+type: edu
+custom_name: stage1
+files:
+- name: src/flashcards/Main.java
+  visible: true
+  text: |
+    package flashcards;
+
+    public class Main {
+        public static void main(String[] args) {
+            System.out.println("Hello World!");
+        }
+    }
+  learner_created: false
+- name: test/FlashcardsTest.java
+  visible: false
+  text: |
+    import common.FlashcardsStage1Test;
+
+    public class FlashcardsTest extends FlashcardsStage1Test {
+        // just empty class, but not abstract so it can be run
+    }
+  learner_created: false
+feedback_link: https://hyperskill.org/projects/44/stages/232/implement
+status: Solved
+record: 5

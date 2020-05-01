@@ -1,0 +1,61 @@
+<h2 style="text-align: center;">Description</h2>
+
+<p>Add some statistics features. We suggest you implement the following:</p>
+
+<ul>
+	<li>Action <code class="java">log</code> saves the application log to the given file. Save all lines that have been input in or output to the console to the file. You can use a list to store the lines.</li>
+	<li>Action <code class="java">hardest card</code> prints the term of the card that has the most mistakes. You can store the mistake count in a map. If there are no cards with mistakes, you should print <code class="java">There are no cards with errors.</code>. And for multiple hardest cards, you should list them all, like in the example below.</li>
+	<li>Action <code class="java">reset stats</code> erases the mistake counts for all cards.</li>
+</ul>
+
+<p>Also you should update serialization/deserialization to store sets of three items (term, definition, mistakes) instead of pairs (term, definition).</p>
+
+<h2 style="text-align: center;">Example</h2>
+
+<p>The symbol <code class="java">&gt;</code> represents the user input. Notice that it's not the part of the input.</p>
+
+<pre><code class="language-no-highlight">Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; hardest card
+There are no cards with errors.
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; import
+File name:
+&gt; capitals.txt
+28 cards have been loaded.
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; hardest card
+The hardest card is "France". You have 10 errors answering it.
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; ask
+How many times to ask?
+&gt; 1
+Print the definition of "Russia":
+&gt; Paris
+Wrong answer. (The correct one is "Moscow", you've just written the definition of "France" card.)
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; hardest card
+The hardest cards are "Russia", "France". You have 10 errors answering them.
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; reset stats
+Card statistics has been reset.
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; hardest card
+There are no cards with errors.
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; log
+File name:
+&gt; todayLog.txt
+The log has been saved.
+
+Input the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):
+&gt; exit
+Bye bye!</code></pre>
+
+<p><em>Note that all your outputs and user inputs should be on separate lines.</em></p>
